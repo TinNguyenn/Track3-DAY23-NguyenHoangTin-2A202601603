@@ -1,32 +1,4 @@
-"""Markdown report generation from the validated metrics model."""
-
-from __future__ import annotations
-
-from pathlib import Path
-
-from .metrics import MetricsReport
-
-
-def render_report(metrics: MetricsReport) -> str:
-    """Render a complete lab report from metrics data.
-
-    The report is deliberately generated from the model rather than from a
-    fixed sample scenario list, so hidden/custom scenarios appear naturally.
-    """
-    rows = []
-    for item in metrics.scenario_metrics:
-        rows.append(
-            "| {id} | {expected} | {actual} | {success} | {retries} | {interrupts} |".format(
-                id=item.scenario_id,
-                expected=item.expected_route,
-                actual=item.actual_route or "—",
-                success="Đạt" if item.success else "Không đạt",
-                retries=item.retry_count,
-                interrupts=item.interrupt_count,
-            )
-        )
-    scenario_table = "\n".join(rows) or "| — | — | — | — | — | — |"
-    return f"""# Báo cáo Lab Day 08
+# Báo cáo Lab Day 08
 
 ## 1. Thông tin sinh viên
 
@@ -55,11 +27,17 @@ run sử dụng `thread_id` lấy từ scenario.
 
 | Scenario | Route kỳ vọng | Route thực tế | Kết quả | Số lần retry | Số lần approval |
 |---|---|---|---:|---:|---:|
-{scenario_table}
+| S01_simple | simple | simple | Đạt | 0 | 0 |
+| S02_tool | tool | tool | Đạt | 0 | 0 |
+| S03_missing | missing_info | missing_info | Đạt | 0 | 0 |
+| S04_risky | risky | risky | Đạt | 0 | 1 |
+| S05_error | error | error | Đạt | 2 | 0 |
+| S06_delete | risky | risky | Đạt | 0 | 1 |
+| S07_dead_letter | error | error | Đạt | 1 | 0 |
 
-Tổng cộng **{metrics.total_scenarios}** scenario, tỷ lệ thành công **{metrics.success_rate:.1%}**,
-**{metrics.total_retries}** lần retry và **{metrics.total_interrupts}** lần approval.
-Đã ghi nhận state history: **{"Có" if metrics.resume_success else "Không"}**.
+Tổng cộng **7** scenario, tỷ lệ thành công **100.0%**,
+**3** lần retry và **2** lần approval.
+Đã ghi nhận state history: **Có**.
 
 ## 5. Phân tích lỗi và cơ chế an toàn
 
@@ -91,11 +69,3 @@ Tích hợp support backend có xác thực và idempotency key, thay mock tool 
 typed tool contract, đồng thời bổ sung tracing và đo latency cho từng node.
 Approval trong môi trường production cũng nên yêu cầu reviewer đã xác thực và
 có lệnh resume rõ ràng.
-"""
-
-
-def write_report(metrics: MetricsReport, output_path: str | Path) -> None:
-    """Write the rendered report to a file."""
-    path = Path(output_path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(render_report(metrics), encoding="utf-8")

@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+import sqlite3
+from pathlib import Path
 from typing import Any
 
 
-def build_checkpointer(kind: str = "memory", database_url: str | None = None) -> Any | None:
+def build_checkpointer(
+    kind: str = "memory", database_url: str | None = None
+) -> Any | None:  # noqa: ANN401
     """Return a LangGraph checkpointer.
 
-    TODO(student): implement SQLite support for the persistence extension track.
-    The starter provides MemorySaver only — SQLite/Postgres are extension tasks.
+    SQLite is the supported durable backend for the lab. The connection is
+    intentionally kept on the saver object for the lifetime of the graph.
 
     For SQLite:
     - pip install langgraph-checkpoint-sqlite
@@ -23,12 +27,29 @@ def build_checkpointer(kind: str = "memory", database_url: str | None = None) ->
 
         return MemorySaver()
     if kind == "sqlite":
-        raise NotImplementedError(
-            "TODO(student): implement SQLite checkpointer. "
-            "Hint: pip install langgraph-checkpoint-sqlite, then use SqliteSaver"
-        )
+        try:
+            from langgraph.checkpoint.sqlite import SqliteSaver
+        except ImportError as exc:
+            raise RuntimeError(
+                "SQLite persistence requires the optional dependency: "
+                "pip install 'langgraph-checkpoint-sqlite>=2.0'"
+            ) from exc
+
+        raw_url = database_url or "outputs/langgraph_checkpoints.sqlite"
+        if raw_url.startswith("sqlite:///"):
+            raw_url = raw_url[10:]
+        if raw_url != ":memory:":
+            db_path = Path(raw_url)
+            db_path.parent.mkdir(parents=True, exist_ok=True)
+            raw_url = str(db_path)
+        connection = sqlite3.connect(raw_url, check_same_thread=False)
+        connection.execute("PRAGMA journal_mode=WAL")
+        connection.execute("PRAGMA busy_timeout=5000")
+        connection.commit()
+        return SqliteSaver(conn=connection)
     if kind == "postgres":
-        raise NotImplementedError(
-            "TODO(student): implement Postgres checkpointer (optional extension)"
+        raise RuntimeError(
+            "Postgres persistence is not enabled in this lab build; use kind='sqlite' "
+            "or install and configure a project-specific Postgres adapter."
         )
     raise ValueError(f"Unknown checkpointer kind: {kind}")
